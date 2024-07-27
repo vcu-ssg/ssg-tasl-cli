@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "tasl"
-version = "0.1.0"
+version = "0.1.2"
 description = ""
 authors = ["John Leonard <john@lowkeylabs.com>"]
 readme = "README.md"
