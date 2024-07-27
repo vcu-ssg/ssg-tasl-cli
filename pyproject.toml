@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "tasl"
+version = "0.1.0"
+description = ""
+authors = ["John Leonard <john@lowkeylabs.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+click = "^8.1.7"
+loguru = "^0.7.2"
+
+[tool.poetry.scripts]
+tasl = "tasl._main:cli"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
