@@ -332,6 +332,7 @@ def scan_for_topics( filename, confirm=False, overwrite=False, destination="." )
         with open(filename, 'r',  encoding='utf-8' ) as file:
             lines = file.readlines()
             ignore = False
+            in_housekeeping = False
             logger.debug(filename)
             for i, line in enumerate(lines):
                 if line.startswith("```"):
@@ -340,22 +341,33 @@ def scan_for_topics( filename, confirm=False, overwrite=False, destination="." )
                         logger.trace("block on")
                     else:
                         logger.trace("block off")
+                    if not in_housekeeping:
+                        blocks[key].append(line)
                     continue
                 if not ignore:
-                    # this identifies a block.
+                    # Toggle in and out of Housekeeping sections.
+                    if line.lower().startswith("## housekeeping"):
+                        logger.debug(f"Housekeeping  ON: {key}  - {filename}")
+                        in_housekeeping = True
+                    elif in_housekeeping and (line.startswith("# ") or line.startswith("## ")):
+                        in_housekeeping = False
+                        logger.debug(f"Housekeeping OFF: {key}  - {filename}")
+                        logger.debug(f"{line}")
+                    
+                    # this identifies a topic block.
                     if line.startswith("# "):
                         key = line[2:].strip()
                         logger.debug(f"found {key}")
                         blocks[key] = []
                         continue
-                    # identify list of topics used.
     
-                    # Search for the pattern in the given line
+                    # Track any use of {{< include ... }} statements.
+                    # If found, add to "uses_topics" list.
                     match = re.search(include_pattern, line)
                     if match:
                         uses_topics[ match.group(1) ] = match.group(1)
-
-                blocks[key].append( line )
+                if not in_housekeeping:
+                    blocks[key].append( line )
     except Exception as e:
         logger.error(f"unable to load file: {filename}\n{e}")
         sys.exit(1)
@@ -654,5 +666,4 @@ def list_topic_files( filters, add_tag=None, remove_tag=None, confirm=False, wit
             logger.success(f"Removing tag: '{add_tag}' from YAML headers.")
         else:
             logger.success(f"NOT Removing tag: '{remove_tag}' to YAML headers.  Use --confirm")
-
 
