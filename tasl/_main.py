@@ -24,20 +24,20 @@ def create(topic,overwrite,template):
 
 @cli.command()
 @click.argument('filename', type=click.Path(exists=True),nargs=-1)
-@click.option("--save",help="Save topics to separate files",is_flag=True, default=False)
+@click.option("--confirm",help="Save topics to separate files",is_flag=True, default=False)
 @click.option("--destination",help="Destination folder for topics",type=click.Path( exists=True, file_okay=False), default=".")
 @click.option("--overwrite",help="Overwrite existing topic files",is_flag=True, default=False)
-def scanl(filename, save, destination, overwrite):
+def scanl(filename, confirm, destination, overwrite):
     """ Scan a QMD for topics (lecture file by section).
     
     """
 
     logger.debug(f"entering scan")
     if isinstance( filename, str ):
-        scan_for_topics( filename, save=save, overwrite=overwrite, destination=destination )
+        scan_for_topics( filename, confirm=confirm, overwrite=overwrite, destination=destination )
     elif isinstance( filename, tuple ):
         for file in filename:
-            scan_for_topics( file, save=save, overwrite=overwrite, destination=destination )
+            scan_for_topics( file, confirm=confirm, overwrite=overwrite, destination=destination )
 
     else:
         logger.debug(f"type: {type(filename)}\n {filename}" )
@@ -45,10 +45,10 @@ def scanl(filename, save, destination, overwrite):
 
 @cli.command()
 @click.argument('filename', type=click.Path(exists=True),nargs=-1)
-@click.option("--save",help="Save topics to separate files",is_flag=True, default=False)
+@click.option("--confirm",help="Save topics to separate files",is_flag=True, default=False)
 @click.option("--destination",help="Destination folder for topics",type=click.Path( exists=True, file_okay=False), default=".")
 @click.option("--overwrite",help="Overwrite existing topic files",is_flag=True, default=False)
-def copy(filename, save, destination, overwrite):
+def copy(filename, confirm, destination, overwrite):
     """ Copies a topic (all related files) to a new folder.
      
        Does not rename topic.
@@ -56,10 +56,10 @@ def copy(filename, save, destination, overwrite):
     """
 
     if isinstance( filename, str ):
-        copy_topic_file( filename, save=save, overwrite=overwrite, destination=destination )
+        copy_topic_file( filename, confirm=confirm, overwrite=overwrite, destination=destination )
     elif isinstance( filename, tuple ):
         for file in filename:
-            copy_topic_file( file, save=save, overwrite=overwrite, destination=destination )
+            copy_topic_file( file, confirm=confirm, overwrite=overwrite, destination=destination )
     else:
         logger.warning(f"Unprocessed type: {type(filename)}\n {filename}" )
 
@@ -100,7 +100,9 @@ def parse_comma_separated(ctx, param, value):
 @click.option("--remove-tag",help="Remove tag from files",default=None)
 @click.option("--confirm",help="Confirm add or remove of tag",is_flag=True, default=False)
 @click.option("--delete",help="Delete matching topics",is_flag=True, default=False)
-def list( filters, add_tag, with_tags, without_tags, remove_tag, confirm, delete ):
+@click.option("--copy",help="Copy matching topics to destination",is_flag=True, default=False)
+@click.option("--destination",help="Destination folder for topics",type=click.Path( exists=True, file_okay=False), default=None)
+def list( filters, add_tag, with_tags, without_tags, remove_tag, confirm, delete, copy, destination ):
     """ List topic files by tag """
 
     logger.debug( filters )
@@ -108,9 +110,11 @@ def list( filters, add_tag, with_tags, without_tags, remove_tag, confirm, delete
     logger.debug( remove_tag )
     logger.debug( with_tags )
     logger.debug( without_tags )
+    logger.debug( copy )
+    logger.debug( destination )
 
     list_topic_files( filters, add_tag=add_tag, remove_tag=remove_tag, confirm=confirm, 
-                     with_tags=with_tags, without_tags=without_tags, delete=delete)
+                     with_tags=with_tags, without_tags=without_tags, delete=delete, copy=copy, destination=destination)
 
 
 

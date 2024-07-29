@@ -148,11 +148,11 @@ def create_file(filename, contents, overwrite=False ):
             logger.info(f"File '{filename}' already exists. Overwriting.")
     
     try:
-        with open(filename, 'w') as file:
+        with open(filename, 'w', encoding="utf-8") as file:
             file.write(contents)
         logger.info(f"File '{filename}' created successfully.")
     except Exception as e:
-        logger.error(f"An error occurred while creating the file: {e}")
+        logger.error(f"An error occurred while creating the file {filename}\n{e}")
         sys.exit(1)
 
 
@@ -237,8 +237,8 @@ def add_new_topic( topic_name, overwrite=False, template_base=None,topic_content
         topic_template = "_" + wrapper_template
 
     if os.path.exists( topic_file_and_path ) and os.path.exists( wrapper_file_and_path ):
-        logger.success(f"Topic ({topic_name}) already exists.  No changes made.")
-        return
+        logger.warning(f"Topic ({topic_name}) already exists.  No changes made.")
+        return topic_file_and_path, wrapper_file_and_path
 
     if not os.path.exists( wrapper_file_and_path ):
         contents = get_wrapper_contents( topic_name, topic_file, template=wrapper_template )
@@ -272,7 +272,7 @@ def extract_assets_from_file( filename ):
     return assets
 
 
-def copy_files_to_destination(destination_folder, file_list, overwrite=False, save=False):
+def copy_files_to_destination(destination_folder, file_list, overwrite=False, confirm=False):
     for file_path in file_list:
         # Construct the full source path
         full_source_path = os.path.normpath( os.path.abspath(file_path) )
@@ -282,7 +282,7 @@ def copy_files_to_destination(destination_folder, file_list, overwrite=False, sa
             logger.info(f'Source file does not exist: {full_source_path}')
             continue
 
-        if save:
+        if confirm:
             # Construct the full destination path
             relative_path = os.path.normpath( os.path.relpath(file_path) )
             full_destination_path = os.path.normpath( os.path.join(destination_folder, relative_path) )
@@ -301,7 +301,7 @@ def copy_files_to_destination(destination_folder, file_list, overwrite=False, sa
         else:
             logger.info(f"Found: {file_path}")
 
-def copy_asset_files( content, destination=".", overwrite=False, save=False ):
+def copy_asset_files( content, destination=".", overwrite=False, confirm=False ):
     """ scan and copy content (a list) looking for 'assets/*'. """
     logger.debug(f"copying asset files")
     files = []
@@ -310,10 +310,15 @@ def copy_asset_files( content, destination=".", overwrite=False, save=False ):
         for match in matches:
             files.append( match )
     logger.debug( files )
-    copy_files_to_destination( destination, files, overwrite=overwrite, save=save )
+    copy_files_to_destination( destination, files, overwrite=overwrite, confirm=confirm )
     
+def extract_lecture_number(filename):
+    match = re.search(r'lect(?:ure)?-?(\d+)', filename)
+    if match:
+        return int(match.group(1))
+    return None
 
-def scan_for_topics( filename, save=False, overwrite=False, destination="." ):
+def scan_for_topics( filename, confirm=False, overwrite=False, destination="." ):
     """ scan filename for topics """
     logger.debug(f'entering scan_for_topics: {filename}')
     include_pattern = r'\{\{< include [\'"]?([^\'">]+)[\'"]? >\}\}'
@@ -355,26 +360,32 @@ def scan_for_topics( filename, save=False, overwrite=False, destination="." ):
         logger.error(f"unable to load file: {filename}\n{e}")
         sys.exit(1)
 
+    if destination==".":
+        logger.warning(f"Creating topics in current directory. Topics are usually created somewhere else.")
+        
     # with each block identified, create new files in destination
     for key in [ key for key in blocks.keys() if not key in ['prefix'] ]:
-        if save:
-            topic_file_and_path,wrapper_file_and_path = add_new_topic( key, destination=destination, overwrite=overwrite, topic_contents="\n".join( blocks[key]) )
-            copy_asset_files( blocks[key], destination=destination, overwrite=overwrite, save=save )
-            tasl = dict( topic=key, source=get_repo_relative_path( filename ) )
+        logger.debug( key )
+        logger.trace( blocks[key] )
+        if confirm:
+            content = f"\n# {key}\n" + "".join(blocks[key])
+            topic_file_and_path,wrapper_file_and_path = add_new_topic( key, destination=destination, overwrite=overwrite, topic_contents=content )
+            copy_asset_files( blocks[key], destination=destination, overwrite=overwrite, confirm=confirm )
+            tasl = dict( topic=key, source=get_repo_relative_path( filename ), tags=["lecture",f"lecture-{extract_lecture_number( filename ):02}"] )
             update_yaml_header( wrapper_file_and_path, tasl=tasl )
         else:
             logger.success(f"Found: {clean_topic_name( key )}" )
             # this call to copy_asset_files will only display asset file found
-            copy_asset_files( blocks[key], destination=destination, overwrite=overwrite, save=save )
+            copy_asset_files( blocks[key], destination=destination, overwrite=overwrite, confirm=confirm )
 
     for key in uses_topics:
         logger.success(f"Includes: {key}")
 
-    if (not save) and (len( blocks.keys() ) > 1):
-        logger.warning(f"Use --save to save topics to files.  Use --overwrite if files already exists.")
+    if (not confirm) and (len( blocks.keys() ) > 1):
+        logger.warning(f"Use --confirm to save topics to files.  Use --overwrite if files already exists.")
 
 
-def copy_topic_file( filename, save=False, overwrite=False, destination="." ):
+def copy_topic_file( filename, confirm=False, overwrite=False, destination="." ):
     """ Copy a topic identified by it's wrapper file to a new destination folder """
     logger.debug(f"Entering copy_topic_file: {filename}")
     files = []
@@ -383,11 +394,11 @@ def copy_topic_file( filename, save=False, overwrite=False, destination="." ):
     files.append( topic_file )
     files = files + extract_assets_from_file( topic_file )
     logger.debug( files )
-    copy_files_to_destination( destination, files, overwrite=overwrite,save=save )
-    if save:
+    copy_files_to_destination( destination, files, overwrite=overwrite, confirm=confirm )
+    if confirm:
         logger.success(f"Topic {filename} copied to {destination}")
     else:
-        logger.success(f"Topic {filename} not copied to {destination}.  Use --save")
+        logger.success(f"Topic {filename} NOT copied to {destination}.  Use --confirm")
 
 def rename_topic_includes( filename, old_topic_file, new_topic_file ):
     with open(filename, 'r') as file:
@@ -474,7 +485,7 @@ def load_topic_files_from_directory(directory_path):
         
         if os.path.isfile(file_path):
             try:
-                with open(file_path, 'r') as file:
+                with open(file_path, 'r', encoding='utf-8') as file:
                     files_content[filename] = dict(content=file.read())
                 files_content[filename]["yaml"] = get_yaml_header( filename[1:] )
             except Exception as e:
@@ -494,12 +505,11 @@ def search_files(directory_path, include_keywords, exclude_keywords, with_tags=[
     :param without_tags
     :return: List of filenames that meet the criteria.
     """
+
     files_content = load_topic_files_from_directory(directory_path)
 
     if files_content=={}:
-        result_files = []
-        return
-
+        return [],[]
 
     result_files = [file for file in files_content]
     logger.debug(f"include_keywords: {include_keywords}")
@@ -512,11 +522,11 @@ def search_files(directory_path, include_keywords, exclude_keywords, with_tags=[
                 result_files.append(filename)
                 logger.debug(f'including: {filename}')
             
-            if "tags" in content["yaml"]:
-                include = any(keyword.lower() in content["yaml"]["tags"] for keyword in with_tags)
+            if "tags" in content["yaml"]["tasl"]:
+                include = any(keyword.lower() in content["yaml"]["tasl"]["tags"] for keyword in with_tags)
                 if include and not( filename in result_files ):
                     result_files.append( filename )
-                    logger.debug(f'including: {filename} for tags: {content["yaml"]["tags"]}')
+                    logger.debug(f'including: {filename} for tags: {content["yaml"]["tasl"]["tags"]}')
 
     if len(exclude_keywords)>0 or (len(without_tags)>0):
         for filename, content in files_content.items():
@@ -524,17 +534,20 @@ def search_files(directory_path, include_keywords, exclude_keywords, with_tags=[
             if exclude:
                 logger.debug(f'excluding: {filename}')
                 result_files = [ file for file in result_files if not file==filename ]
-            if "tags" in content["yaml"]:
-                exclude = any(keyword.lower() in content["yaml"]["tags"] for keyword in without_tags)
+            if "tags" in content["yaml"]["tasl"]:
+                exclude = any(keyword.lower() in content["yaml"]["tasl"]["tags"] for keyword in without_tags)
                 if exclude and ( filename in result_files ):
                     result_files = [ file for file in result_files if not file==filename ]
 
     available_tags = []
     for file in result_files:
-        if "tags" in files_content[file]["yaml"].keys():
-            for tag in files_content[file]["yaml"]["tags"]:
+        logger.debug( files_content[file]["yaml"] )
+        if "tags" in files_content[file]["yaml"]["tasl"].keys():
+            for tag in files_content[file]["yaml"]["tasl"]["tags"]:
+                logger.debug( tag )
                 if not tag in available_tags:
                     available_tags.append( tag )
+                    logger.debug(f"Adding tag: {tag}")
 
     return result_files, available_tags
 
@@ -559,12 +572,14 @@ def delete_topic_files( files,confirm=False ):
     return
 
 
-def list_topic_files( filters, add_tag=None, remove_tag=None, confirm=False, with_tags=None, without_tags=None, delete=False):
+def list_topic_files( filters, add_tag=None, remove_tag=None, confirm=False, with_tags=None, without_tags=None, delete=False, copy=False, destination=None):
     """ List topic files with filters """
     
-    directory_path = "."
+    source_directory_path = "."
     include,exclude = categorize_keywords( filters )
-    result_files, result_tags = search_files( directory_path, include, exclude, with_tags=with_tags, without_tags=without_tags )
+    result_files, result_tags = search_files( source_directory_path, include, exclude, with_tags=with_tags, without_tags=without_tags )
+    logger.debug( result_files )
+    logger.debug( result_tags )
 
     if result_files is None:
         logger.success(f"Error loading files")
@@ -582,7 +597,7 @@ def list_topic_files( filters, add_tag=None, remove_tag=None, confirm=False, wit
         logger.success(f"No files meet criteria")
         return
 
-    logger.success(f"Available tags: {result_tags}")
+    logger.success(f"Available tags: {sorted(result_tags)}")
 
     for file in result_files:
         logger.success(f"Found: {file}" )
@@ -593,6 +608,15 @@ def list_topic_files( filters, add_tag=None, remove_tag=None, confirm=False, wit
             logger.success("Deleted matching topics.")
         else:
             logger.success("NOT deleting matching topics.  Use --confirm")
+        return
+    
+    if copy:
+        if confirm:
+            for result in result_files:
+                copy_topic_file( result[1:], confirm=confirm, overwrite=False, destination=destination )
+            logger.success("Copied matching topics.")
+        else:
+            logger.success("NOT copying matching topics.  Use --confirm")
         return
     
     if not add_tag is None:
