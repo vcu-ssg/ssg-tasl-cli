@@ -16,7 +16,7 @@ default_format = "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level:
 
 
 # Values: "TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL"
-DEFAULT_LOG_LEVEL = 'INFO'
+DEFAULT_LOG_LEVEL = 'SUCCESS'
 
 
 def sniff_log_level():
