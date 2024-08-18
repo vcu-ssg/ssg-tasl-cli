@@ -1,7 +1,10 @@
 
 import os
+import glob
 import click
-from tasl.utils import add_new_topic,scan_for_topics,copy_topic_file,rename_topic_file, list_topic_files, delete_topic_files
+from tasl.utils import add_new_topic,scan_for_topics,copy_topic_file,rename_topic_file, list_topic_files, \
+      delete_topic_files, update_yaml_header, get_yaml_header
+from tasl.slides_from_guide import slides_from_qmd
 from loguru import logger
 from tasl import DEFAULT_LOG_LEVEL
 
@@ -116,6 +119,77 @@ def list( filters, add_tag, with_tags, without_tags, remove_tag, confirm, delete
     list_topic_files( filters, add_tag=add_tag, remove_tag=remove_tag, confirm=confirm, 
                      with_tags=with_tags, without_tags=without_tags, delete=delete, copy=copy, destination=destination)
 
+
+@cli.command()
+@click.option('--file', help="specify a single file to process", type=click.Path(exists=True), default=None )
+@click.option("--folder",help="convert all files in this folder",type=click.Path(exists=True), default=None)
+@click.option("--exclude-files",multiple=True, type=click.Path(), help="exclude these files from the folder",default=['index.qmd'])
+@click.option("--confirm",help="perform the conversion",is_flag=True, default=False)
+@click.option("--delete",help="delete the files from current folder",is_flag=True, default=False)
+@click.option("--add-tag",help="Assign tag to the files",default=None)
+def slides_from(file, folder, exclude_files, confirm, delete,add_tag ):
+    """ Deletes topic QMD and related files. """
+    if file is None and folder is None:
+        logger.error("Must specific either --file or --folder")
+        return
+    
+    if not file is None:
+        one_file = file
+        if confirm:
+            slides_from_qmd( file )        
+            logger.success(f"Topic from guide: {os.path.splitext(os.path.basename(file))[0]}.")
+        else:
+            # Print or process the filtered files
+            if os.path.exists( os.path.basename(one_file) ):
+                logger.warning(f"{one_file} already exists.")
+            else:
+                logger.success(f"Topic from guide: {os.path.splitext(os.path.basename(file))[0]} NOT built.  Use --confirm")
+
+    if not folder is None:
+        all_files = glob.glob(os.path.join(folder, '*'))
+        filtered_files = [f for f in all_files if os.path.basename(f) not in exclude_files]
+
+        if confirm:
+            for one_file in filtered_files:
+                if (not add_tag is None) and os.path.exists( os.path.basename(one_file) ):
+
+                    logger.debug(f"getting header from: { os.path.basename(one_file)}")
+                    header = get_yaml_header(  os.path.basename(one_file) )
+                    logger.debug( header )
+                    if not "tasl" in header.keys():
+                        header["tasl"] = {}
+                    if not "tags" in header["tasl"]:
+                        header["tasl"]["tags"] = []
+                    if not add_tag.lower() in header["tasl"]["tags"]:
+                        header["tasl"]["tags"].append( add_tag.lower() )
+                    logger.debug( header )
+                    update_yaml_header( os.path.basename(one_file), **header )
+                    h2 = get_yaml_header(  os.path.basename(one_file) ) 
+                    logger.debug(f"h2: {h2}")
+                    logger.success(f"Added tag: '{add_tag}' to YAML headers for { os.path.basename(one_file) }.")
+
+                elif not delete:
+                    
+                    slides_from_qmd( one_file )
+                    logger.success(f"Topic from guide: {os.path.splitext(os.path.basename(one_file))[0]} built.")
+                  
+                else:
+                    if os.path.exists( os.path.basename(one_file) ):
+                        os.remove( os.path.basename(one_file) )
+                    if os.path.exists( os.path.basename("_"+one_file) ):
+                        os.remove( os.path.basename("_"+ one_file ) )
+                    logger.success(f"Topic deleted from current folder: {os.path.splitext(os.path.basename(one_file))[0]}")
+        else:
+            for one_file in filtered_files:
+                if os.path.exists( os.path.basename(one_file) ):
+                    if delete:
+                        logger.success(f"Not deleting topic {os.path.basename(one_file)}.  Use --confirm.")
+                    elif (not add_tag is None) and os.path.exists( os.path.basename(one_file) ):
+                        logger.success(f"Tag NOT added: '{add_tag}' to YAML headers for { os.path.basename(one_file) }. Use --confirm")
+                    else:
+                        logger.warning(f"Topic exists: {os.path.splitext(os.path.basename(one_file))[0]} NOT built.  Use --confirm")
+                else:
+                    logger.success(f"Topic from guide: {os.path.splitext(os.path.basename(one_file))[0]} NOT built.  Use --confirm")
 
 
 if __name__ == '__main__':

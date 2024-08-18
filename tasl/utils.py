@@ -533,12 +533,13 @@ def search_files(directory_path, include_keywords, exclude_keywords, with_tags=[
             if include:
                 result_files.append(filename)
                 logger.debug(f'including: {filename}')
-            
-            if "tags" in content["yaml"]["tasl"]:
-                include = any(keyword.lower() in content["yaml"]["tasl"]["tags"] for keyword in with_tags)
-                if include and not( filename in result_files ):
-                    result_files.append( filename )
-                    logger.debug(f'including: {filename} for tags: {content["yaml"]["tasl"]["tags"]}')
+            if "yaml" in content.keys():
+                if "tasl" in content["yaml"].keys():
+                    if "tags" in content["yaml"]["tasl"]:
+                        include = any(keyword.lower() in content["yaml"]["tasl"]["tags"] for keyword in with_tags)
+                        if include and not( filename in result_files ):
+                            result_files.append( filename )
+                            logger.debug(f'including: {filename} for tags: {content["yaml"]["tasl"]["tags"]}')
 
     if len(exclude_keywords)>0 or (len(without_tags)>0):
         for filename, content in files_content.items():
@@ -546,20 +547,24 @@ def search_files(directory_path, include_keywords, exclude_keywords, with_tags=[
             if exclude:
                 logger.debug(f'excluding: {filename}')
                 result_files = [ file for file in result_files if not file==filename ]
-            if "tags" in content["yaml"]["tasl"]:
-                exclude = any(keyword.lower() in content["yaml"]["tasl"]["tags"] for keyword in without_tags)
-                if exclude and ( filename in result_files ):
-                    result_files = [ file for file in result_files if not file==filename ]
+            if "yaml" in content.keys():
+                if "tasl" in content["yaml"].keys():
+                    if "tags" in content["yaml"]["tasl"]:
+                        exclude = any(keyword.lower() in content["yaml"]["tasl"]["tags"] for keyword in without_tags)
+                        if exclude and ( filename in result_files ):
+                            result_files = [ file for file in result_files if not file==filename ]
 
     available_tags = []
     for file in result_files:
-        logger.debug( files_content[file]["yaml"] )
-        if "tags" in files_content[file]["yaml"]["tasl"].keys():
-            for tag in files_content[file]["yaml"]["tasl"]["tags"]:
-                logger.debug( tag )
-                if not tag in available_tags:
-                    available_tags.append( tag )
-                    logger.debug(f"Adding tag: {tag}")
+        if "yaml" in files_content[file].keys():
+            logger.debug( files_content[file]["yaml"] )
+            if "tasl" in files_content[file]["yaml"].keys():
+                if "tags" in files_content[file]["yaml"]["tasl"].keys():
+                    for tag in files_content[file]["yaml"]["tasl"]["tags"]:
+                        logger.debug( tag )
+                        if not tag in available_tags:
+                            available_tags.append( tag )
+                            logger.debug(f"Adding tag: {tag}")
 
     return result_files, available_tags
 
@@ -584,10 +589,9 @@ def delete_topic_files( files,confirm=False ):
     return
 
 
-def list_topic_files( filters, add_tag=None, remove_tag=None, confirm=False, with_tags=None, without_tags=None, delete=False, copy=False, destination=None):
+def list_topic_files( filters, source_directory_path=".", add_tag=None, remove_tag=None, confirm=False, with_tags=None, without_tags=None, delete=False, copy=False, destination=None):
     """ List topic files with filters """
     
-    source_directory_path = "."
     include,exclude = categorize_keywords( filters )
     result_files, result_tags = search_files( source_directory_path, include, exclude, with_tags=with_tags, without_tags=without_tags )
     logger.debug( result_files )
@@ -637,15 +641,17 @@ def list_topic_files( filters, add_tag=None, remove_tag=None, confirm=False, wit
                 logger.debug(f"getting header from: {file[1:]}")
                 header = get_yaml_header( file[1:] )
                 logger.debug( header )
-                if not "tags" in header.keys():
-                    header["tags"] = []
-                if not add_tag.lower() in header["tags"]:
-                    header["tags"].append( add_tag.lower() )
+                if not "tasl" in header.keys():
+                    header["tasl"] = {}
+                if not "tags" in header["tasl"]:
+                    header["tasl"]["tags"] = []
+                if not add_tag.lower() in header["tasl"]["tags"]:
+                    header["tasl"]["tags"].append( add_tag.lower() )
                 logger.debug( header )
                 update_yaml_header(file[1:], **header )
                 h2 = get_yaml_header( file[1:] )
                 logger.debug(f"h2: {h2}")
-            logger.success(f"Adding tag: '{add_tag}' to YAML headers.")
+                logger.success(f"Adding tag: '{add_tag}' to YAML headers for {file[1:]}.")
         else:
             logger.success(f"NOT Adding tag: '{add_tag}' to YAML headers.  Use --confirm")
 

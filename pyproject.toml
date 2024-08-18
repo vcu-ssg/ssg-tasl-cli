@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "tasl"
-version = "0.1.2"
+version = "0.2.0"
 description = ""
 authors = ["John Leonard <john@lowkeylabs.com>"]
 readme = "README.md"
@@ -10,9 +10,16 @@ python = "^3.12"
 click = "^8.1.7"
 loguru = "^0.7.2"
 pyyaml = "^6.0.1"
-#jupyter = "^1.0.0"
-#matplotlib = "^3.9.1"
-#plotly = "^5.23.0"
+python-frontmatter = "^1.1.0"
+markdown = "^3.7"
+beautifulsoup4 = "^4.12.3"
+pyfiglet = "^1.0.2"
+jupyter = "^1.0.0"
+matplotlib = "^3.9.2"
+plotly = "^5.23.0"
+markdown-it-py = "^3.0.0"
+mdformat = "^0.7.17"
+linkify-it-py = "^2.0.3"
 
 [tool.poetry.scripts]
 tasl = "tasl._main:cli"
