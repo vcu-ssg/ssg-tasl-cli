@@ -615,8 +615,9 @@ def list_topic_files( filters, source_directory_path=".", add_tag=None, remove_t
 
     logger.success(f"Available tags: {sorted(result_tags)}")
 
+    include_path = "../../topics/"
     for file in result_files:
-        logger.success(f"Found: {file}" )
+        logger.success(f"{{{{<include  {include_path}{file} >}}}}" )
 
     if delete:
         if confirm:
