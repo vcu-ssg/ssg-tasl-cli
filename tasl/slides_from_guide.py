@@ -5,6 +5,7 @@ Slides from guide
 import os
 import re
 import sys
+import html
 import shutil
 import frontmatter
 import markdown
@@ -79,6 +80,89 @@ def extract_md_content_under_h2(tokens, header_name):
 
     return h2_content
 
+def unescape_string(input_string):
+    # Replace "\\_" with "_"
+    cleaned_string = input_string.replace(r'\_', '_')
+    
+    # Use regular expression to replace "\\" with "\" except when it's at the end of a line
+    # (?!$) is a negative lookahead that ensures we don't replace backslashes at the end of the string
+    cleaned_string = re.sub(r'\\\\(?!$)', r'\\', cleaned_string)
+    return cleaned_string
+
+def unescape_string1(input_string):
+    # Step 1: Unescape HTML characters
+    cleaned_string = html.unescape(input_string)
+    
+    # Step 2: Unescape LaTeX characters
+    # Remove double backslashes before LaTeX commands like \alpha, \beta, etc.
+    # We can use a simple regex to remove the extra backslash for LaTeX commands
+    cleaned_string = re.sub(r'\\\\([a-zA-Z]+)', r'\\\1', cleaned_string)
+    
+    # If there are other specific LaTeX escapes, you can handle them here
+    return cleaned_string
+
+def extract_div_blocks(markdown):
+    # Regular expression to find blocks and their classes
+    block_pattern = r"::: \{\.(\S+)\}([\s\S]*?):::"
+
+    # Find all matches of the blocks
+    blocks = re.findall(block_pattern, markdown)
+
+    # Create a dictionary where the key is the class name and the value is the block content
+    block_dict = {block[0]: block[1].strip() for block in blocks}
+
+    for key in block_dict.keys():
+        block_dict[key] = unescape_string( block_dict[key] )
+
+    # Remove the matched blocks from the markdown
+    cleaned_markdown = re.sub(block_pattern, '<!-- -->', markdown)
+
+    return block_dict, cleaned_markdown
+
+def convert_headers(markdown):
+    # Regular expression to match headers starting with ###
+    header_pattern = r"^### (.+)$"
+
+    # Substitute ### with ## for all matches
+    cleaned_markdown = re.sub(header_pattern, r"## \1", markdown, flags=re.MULTILINE)
+
+    return cleaned_markdown
+
+
+def convert_headers_outside_containers(markdown):
+    # Regular expression to find blocks that start with ::: {.something} and end with :::
+    block_pattern = r"::: \{.*?\}([\s\S]*?):::"
+    
+    # Find all blocks and store their positions
+    blocks = [(m.start(), m.end()) for m in re.finditer(block_pattern, markdown)]
+    
+    # Regular expression to match H3 headers (### something)
+    header_pattern = r"^### (.+)$"
+    
+    # Split the markdown into lines
+    lines = markdown.splitlines()
+    
+    # Function to check if a line index is within any container block
+    def is_inside_block(line_start, line_end):
+        for block_start, block_end in blocks:
+            if block_start <= line_start < block_end or block_start < line_end <= block_end:
+                return True
+        return False
+    
+    # Iterate through lines and convert headers that are outside containers
+    for i, line in enumerate(lines):
+        if line.startswith("###"):
+            line_start = sum(len(l) + 1 for l in lines[:i])  # Calculate line start position in the original markdown
+            line_end = line_start + len(line)
+            
+            # If the line is not inside any container, convert it to H2
+            if not is_inside_block(line_start, line_end):
+                lines[i] = re.sub(header_pattern, r"## \1", line)
+    
+    # Join lines back together to form the final markdown
+    cleaned_markdown = "\n".join(lines)
+    
+    return cleaned_markdown
 
 def replace_height_in_style(div_element,new_height):
     # Ensure that the input is a div element
@@ -116,7 +200,7 @@ def process_html_content(post, html_content):
     logger.debug(f"{title}")
     soup = BeautifulSoup(html_content, 'html.parser')
 
-    md = MarkdownIt("gfm-like")
+    md = MarkdownIt("gfm-like",{"html": True})  # don't escape html or latex characters.
 
     s = ""
     s = s + f"\n# {title}\n"
@@ -347,12 +431,58 @@ def process_html_content(post, html_content):
                 renderer = MDRenderer()
                 output_markdown = renderer.render(results, {}, {})
                 logger.debug( output_markdown )
+
+                # this is a bug fix.  The generator sometimes print "   :::"
                 lines = output_markdown.split("\n")
                 for i,line in enumerate(lines):
                     if line.startswith("  :::"):
                         lines[i] = line.replace("  :::",":::")
                 output_markdown = "\n".join( lines )
-                s = s + "\n" + output_markdown + "\n"
+
+                ## For purposes of converting the guide to slide, any H3 under an H2
+                ## will be converted to an H2.
+                ## Once this is done, we need to reextract the new content.
+
+                cleaned_markdown = convert_headers_outside_containers( output_markdown )
+
+                logger.debug( cleaned_markdown )
+                if not output_markdown == cleaned_markdown:
+                    logger.info("Converting H3 to H2 for slides.")
+
+                h2_pattern = r"(## .+)([\s\S]*?)(?=## |\Z)"
+
+                # Find all H2 blocks using the regular expression
+                h2_blocks = re.findall(h2_pattern, cleaned_markdown)
+
+                for h2, output_markdown in h2_blocks:
+                    logger.debug( h2 )
+                    logger.debug( output_markdown )
+
+                    block_dict, cleaned_markdown = extract_div_blocks(output_markdown)
+
+                    logger.debug( block_dict )
+                    logger.debug( cleaned_markdown )
+
+                    widths = dict(left="47%",middle="6%",right="47%")
+                    if len(block_dict.get("guide-block-right",""))<5:
+                        widths = dict(left="98%",middle="1%",right="1%")
+
+                    side_by_side_table = f"""
+:::: {{.columns}}
+::: {{.column width={widths["left"]}}}
+{ unescape_string(block_dict.get("guide-block-left","")) }
+:::
+::: {{.column width={widths["middle"]}}}
+:::
+::: {{.column width={widths["right"]}}}
+{ unescape_string( block_dict.get("guide-block-right","") )}
+:::
+::::
+"""
+                    cleaned_markdown = unescape_string( cleaned_markdown )
+                    output_markdown = h2 + "\n" + cleaned_markdown.replace("<!-- -->",side_by_side_table,1)
+
+                    s = s + "\n" + output_markdown + "\n"
 
 
         s = s + "\n\n"
