@@ -1,12 +1,12 @@
 [tool.poetry]
 name = "tasl"
-version = "0.2.4"
+version = "0.2.5"
 description = ""
 authors = ["John Leonard <john@lowkeylabs.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = "^3.13"
 click = "^8.1.7"
 loguru = "^0.7.2"
 pyyaml = "^6.0.1"
