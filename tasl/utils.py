@@ -184,9 +184,9 @@ title: "{topic_name}"
 
 def get_topic_contents( topic_name, template=None ):
     """ return contents for a topic file.  If template is available, use it. """
-    contents = f"""# {topic_name}
+    contents = f"""<!-- # {topic_name} -->
 
-## Slide 1
+## {topic_name}
 :::: {{.columns}}
 
 ::: {{.column width="50%"}}
@@ -205,7 +205,7 @@ def get_topic_contents( topic_name, template=None ):
 :::
 ::::
 
-    """
+"""
     if not template is None:
         if os.path.exists(template):
             logger.info(f"Using default template: {template}")
