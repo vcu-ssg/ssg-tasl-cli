@@ -397,9 +397,9 @@ def scan_for_topics( filename, confirm=False, overwrite=False, destination="." )
         logger.warning(f"Use --confirm to save topics to files.  Use --overwrite if files already exists.")
 
 
-def copy_topic_file( filename, confirm=False, overwrite=False, destination="." ):
+def copy_topic_file_to_folder( filename, confirm=False, overwrite=False, destination="." ):
     """ Copy a topic identified by it's wrapper file to a new destination folder """
-    logger.debug(f"Entering copy_topic_file: {filename}")
+    logger.debug(f"Entering copy_topic_file_to_folder: {filename}")
     files = []
     files.append( filename )
     topic_file = "_" + filename
@@ -411,6 +411,49 @@ def copy_topic_file( filename, confirm=False, overwrite=False, destination="." )
         logger.success(f"Topic {filename} copied to {destination}")
     else:
         logger.success(f"Topic {filename} NOT copied to {destination}.  Use --confirm")
+
+
+def copy_topic_file( from_filename, to_filename ):
+    logger.info(f"Entering copy_topic_file: {from_filename} to {to_filename}")
+    try:
+        # Step 1: check if to_filename exists
+        if os.path.exists(to_filename):
+            logger.error(f"Target file already exists: {to_filename}")
+            return False
+
+        # Step 2: check if "_"+to_filename exists
+        if os.path.exists("_" + to_filename):
+            logger.error(f"Target underscore file already exists: _{to_filename}")
+            return False
+
+        # Step 3: copy contents of from_filename to to_filename
+        shutil.copy(from_filename, to_filename)
+
+        # Step 4: copy contents of "_"+from_filename to "_"+to_filename
+        from_underscore = "_" + from_filename
+        to_underscore = "_" + to_filename
+
+        if os.path.exists(from_underscore):
+            shutil.copy(from_underscore, to_underscore)
+        else:
+            logger.warning(f"Source underscore file not found: {from_underscore}")
+
+        # Step 5: substitute "_from_filename" with "_to_filename" inside to_filename
+        with open(to_filename, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        content = content.replace("_" + from_filename, "_" + to_filename)
+
+        with open(to_filename, "w", encoding="utf-8") as f:
+            f.write(content)
+
+        logger.info(f"Successfully copied and updated {from_filename} -> {to_filename}")
+        return True
+
+    except Exception as e:
+        logger.exception(f"Error in copy_topic_file: {e}")
+        return False
+
 
 def rename_topic_includes( filename, old_topic_file, new_topic_file ):
     with open(filename, 'r') as file:

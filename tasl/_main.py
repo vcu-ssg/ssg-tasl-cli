@@ -2,8 +2,9 @@
 import os
 import glob
 import click
-from tasl.utils import add_new_topic,scan_for_topics,copy_topic_file,rename_topic_file, list_topic_files, \
-      delete_topic_files, update_yaml_header, get_yaml_header
+from tasl.utils import add_new_topic,scan_for_topics,copy_topic_file_to_folder, \
+    copy_topic_file,rename_topic_file, list_topic_files, \
+    delete_topic_files, update_yaml_header, get_yaml_header
 from tasl.slides_from_guide import slides_from_qmd
 from loguru import logger
 from tasl import DEFAULT_LOG_LEVEL
@@ -51,7 +52,7 @@ def scanl(filename, confirm, destination, overwrite):
 @click.option("--confirm",help="Save topics to separate files",is_flag=True, default=False)
 @click.option("--destination",help="Destination folder for topics",type=click.Path( exists=True, file_okay=False), default=".")
 @click.option("--overwrite",help="Overwrite existing topic files",is_flag=True, default=False)
-def copy(filename, confirm, destination, overwrite):
+def copy_to_folder(filename, confirm, destination, overwrite):
     """ Copies a topic (all related files) to a new folder.
      
        Does not rename topic.
@@ -59,13 +60,21 @@ def copy(filename, confirm, destination, overwrite):
     """
 
     if isinstance( filename, str ):
-        copy_topic_file( filename, confirm=confirm, overwrite=overwrite, destination=destination )
+        copy_topic_file_to_folder( filename, confirm=confirm, overwrite=overwrite, destination=destination )
     elif isinstance( filename, tuple ):
         for file in filename:
-            copy_topic_file( file, confirm=confirm, overwrite=overwrite, destination=destination )
+            copy_topic_file_to_folder( file, confirm=confirm, overwrite=overwrite, destination=destination )
     else:
         logger.warning(f"Unprocessed type: {type(filename)}\n {filename}" )
 
+@cli.command()
+@click.argument('from_filename', type=click.Path(exists=True),nargs=1)
+@click.argument('to_filename', type=click.Path(exists=False),nargs=1)
+def copy(from_filename, to_filename ):
+    """ Copies a topic (all related files) to new file
+     
+    """
+    copy_topic_file( from_filename, to_filename )
 
 @cli.command()
 @click.argument('wrapper_qmd', type=click.Path(exists=True),nargs=1)
